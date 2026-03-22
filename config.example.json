@@ -1,0 +1,4 @@
+{
+    "moodle_url": "https://your-moodle.edu/calendar/export_execute.php?userid=XXXXX&authtoken=YYYYY&preset_what=courses&preset_time=custom",
+    "output": "moodle-filtered.ics"
+}

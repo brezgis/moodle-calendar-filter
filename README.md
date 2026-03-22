@@ -1,0 +1,195 @@
+# moodle-calendar-filter
+
+A Python script that cleans up Moodle's iCal calendar feed — it strips out attendance events, converts assignments into tasks (VTODO), prepends course codes to event names, and produces a clean `.ics` file you can subscribe to from any calendar app. No dependencies beyond Python 3.10+.
+
+## Why
+
+Moodle's calendar export is noisy. Every attendance check-in creates an event, assignments look the same as lectures, and there's no way to see *just* what's due. This script fetches your Moodle calendar, throws out the clutter, and gives you a focused feed where assignments show up as **tasks with due dates** and class events stay as regular calendar events.
+
+## Quick Start
+
+```bash
+# 1. Clone
+git clone https://github.com/brezgis/moodle-calendar-filter.git
+cd moodle-calendar-filter
+
+# 2. Configure
+cp config.example.json config.json
+# Edit config.json with your Moodle calendar URL (see Configuration below)
+
+# 3. Run
+python3 filter-moodle-calendar.py
+```
+
+Your filtered calendar is now at `moodle-filtered.ics`.
+
+## Configuration
+
+The script reads settings from three sources (highest priority first):
+
+1. **Command-line arguments** — `--url`, `--output`, `--tasks-only`, etc.
+2. **Environment variables** — `MOODLE_CALENDAR_URL`, `MOODLE_OUTPUT`
+3. **`config.json`** — all settings in one file
+
+### Getting Your Moodle Calendar URL
+
+1. Log in to Moodle
+2. Go to **Calendar** → **Export calendar**
+3. Select: **All courses**, **Custom time range** (or your preference)
+4. Click **Get calendar URL** — copy the full URL
+5. Paste it into `config.json` as `moodle_url`
+
+### Command-Line Arguments
+
+```
+--url URL          Moodle calendar export URL
+--output, -o PATH  Output .ics file (default: moodle-filtered.ics)
+--config PATH      Path to config.json
+--keep-events      Keep class events alongside tasks (default)
+--no-keep-events   Only output assignments — drop class events
+--tasks-only       Output only VTODO items, no VEVENT at all
+```
+
+### config.json
+
+```json
+{
+    "moodle_url": "https://your-moodle.edu/calendar/export_execute.php?userid=XXXXX&authtoken=YYYYY&preset_what=courses&preset_time=custom",
+    "output": "moodle-filtered.ics"
+}
+```
+
+You can also add custom filter patterns — see [Customization](#customization).
+
+## Calendar App Setup
+
+Once you have a filtered `.ics` file, point your calendar app at it.
+
+### BusyCal
+
+BusyCal can subscribe to a local file, which is ideal for cron-refreshed calendars:
+
+1. **File → Subscribe…**
+2. Enter the file path as a URL: `file:///path/to/moodle-filtered.ics`
+3. Set refresh to **Every hour** (or let cron handle it and set to **Manually**)
+4. Tasks from VTODO entries appear in BusyCal's task list with due dates ✓
+
+### Apple Calendar
+
+**Option A — Subscribe (recommended):**
+1. **File → New Calendar Subscription…**
+2. Enter `file:///path/to/moodle-filtered.ics`
+3. Set auto-refresh interval
+
+**Option B — Import (one-time):**
+1. **File → Import…** → select the `.ics` file
+2. Note: imported events won't update automatically
+
+> **Tip:** Apple Calendar shows VTODO tasks in the Reminders integration. Make sure Reminders is enabled in System Settings.
+
+### Google Calendar
+
+Google Calendar can't read local files, so you'll need to host the `.ics` somewhere accessible:
+
+1. Host the file on a web server, Dropbox (public link), or a simple HTTP server
+2. In Google Calendar: **Settings → Add calendar → From URL**
+3. Paste the URL to your hosted `.ics` file
+4. Google refreshes subscribed calendars every 12–24 hours
+
+> **Note:** Google Calendar does not support VTODO items natively. Use `--no-keep-events` to skip this, or stick with VEVENT output if you're using Google Calendar exclusively.
+
+### Outlook
+
+1. **File → Open & Export → Import/Export**
+2. Select **Import an iCalendar (.ics) file**
+3. Browse to `moodle-filtered.ics`
+4. Choose **Open as New Calendar** to keep it separate
+
+For Outlook on the web: **Add calendar → Subscribe from web** with a hosted URL.
+
+## Cron Setup
+
+Auto-refresh your calendar every hour:
+
+```bash
+# Edit your crontab
+crontab -e
+
+# Add this line (adjust paths):
+0 * * * * cd /path/to/moodle-calendar-filter && python3 filter-moodle-calendar.py >> /tmp/moodle-filter.log 2>&1
+```
+
+Or use the included setup helper:
+
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+## How the Filtering Works
+
+The script processes each `VEVENT` in the Moodle iCal feed:
+
+| Step | What happens |
+|------|-------------|
+| **1. Drop noise** | Events matching `DROP_PATTERNS` (attendance, etc.) are removed entirely |
+| **2. Detect assignments** | Events matching `ASSIGNMENT_PATTERNS` (homework, quiz, exam, due, etc.) are flagged |
+| **3. Prepend course codes** | A course code (e.g., `LING 130`, `COSI 114`) is extracted from the event's categories/description and prepended to the summary |
+| **4. Convert to tasks** | Assignment events become `VTODO` items with all-day due dates — they show up as tasks in compatible apps |
+| **5. Keep the rest** | Non-assignment events (lectures, office hours) pass through as regular `VEVENT` entries |
+
+### What Gets Dropped
+
+- Attendance check-in events
+- Anything matching patterns in `DROP_PATTERNS`
+
+### What Becomes a Task (VTODO)
+
+- Assignments, homework, quizzes, exams, projects, papers, problem sets
+- Anything matching patterns in `ASSIGNMENT_PATTERNS`
+- Converted to all-day tasks with a due date (no start time)
+
+### What Stays as an Event
+
+- Classes, lectures, office hours, review sessions — everything else
+
+## Customization
+
+### Adding Filter Patterns
+
+Edit `config.json` to add your own patterns:
+
+```json
+{
+    "moodle_url": "https://...",
+    "output": "moodle-filtered.ics",
+    "assignment_patterns": [
+        "assignment", "homework", "hw\\d", "quiz", "exam",
+        "midterm", "final", "submission", "due", "project",
+        "paper", "essay", "lab\\s*\\d", "programming",
+        "problem\\s*set", "ps\\d",
+        "response paper", "reading response"
+    ],
+    "drop_patterns": [
+        "attendance", "attenda",
+        "check-in"
+    ],
+    "course_code_prefixes": "COSI|LING|PHIL|MATH|CS|ANTH|BIOL|CHEM"
+}
+```
+
+Patterns are Python regular expressions matched case-insensitively against event summaries.
+
+### Adding Course Code Prefixes
+
+The script looks for course codes like `COSI 114a` or `LING-130` in event metadata. If your institution uses different department codes, add them to `course_code_prefixes` in your config (pipe-separated):
+
+```json
+{
+    "course_code_prefixes": "CS|MATH|ENG|HIST|BIO|PHYS"
+}
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
