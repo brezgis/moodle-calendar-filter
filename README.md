@@ -1,6 +1,6 @@
 # moodle-calendar-filter
 
-A Python script that cleans up Moodle's iCal calendar feed — it strips out attendance events, converts assignments into tasks (VTODO), prepends course codes to event names, and produces a clean `.ics` file you can subscribe to from any calendar app. No dependencies beyond Python 3.10+.
+A Python script that cleans up Moodle's iCal calendar feed -- it strips out attendance events, converts assignments into tasks (VTODO), prepends course codes to event names, and produces a clean `.ics` file you can subscribe to from any calendar app. No dependencies beyond Python 3.10+.
 
 ## Why
 
@@ -27,27 +27,28 @@ Your filtered calendar is now at `moodle-filtered.ics`.
 
 The script reads settings from three sources (highest priority first):
 
-1. **Command-line arguments** — `--url`, `--output`, `--tasks-only`, etc.
-2. **Environment variables** — `MOODLE_CALENDAR_URL`, `MOODLE_OUTPUT`
-3. **`config.json`** — all settings in one file
+1. **Command-line arguments** -- `--url`, `--output`, `--tasks-only`, etc.
+2. **Environment variables** -- `MOODLE_CALENDAR_URL`, `MOODLE_OUTPUT`
+3. **`config.json`** -- all settings in one file
 
 ### Getting Your Moodle Calendar URL
 
 1. Log in to Moodle
-2. Go to **Calendar** → **Export calendar**
+2. Go to **Calendar** -> **Export calendar**
 3. Select: **All courses**, **Custom time range** (or your preference)
-4. Click **Get calendar URL** — copy the full URL
+4. Click **Get calendar URL** -- copy the full URL
 5. Paste it into `config.json` as `moodle_url`
 
 ### Command-Line Arguments
 
 ```
---url URL          Moodle calendar export URL
---output, -o PATH  Output .ics file (default: moodle-filtered.ics)
---config PATH      Path to config.json
---keep-events      Keep class events alongside tasks (default)
---no-keep-events   Only output assignments — drop class events
---tasks-only       Output only VTODO items, no VEVENT at all
+--url URL              Moodle calendar export URL
+--output, -o PATH      Output .ics file (default: moodle-filtered.ics)
+--config PATH          Path to config.json
+--keep-events          Keep class events alongside tasks (default)
+--no-keep-events       Only output assignments -- drop class events
+--tasks-only           Output only VTODO items, no VEVENT at all
+--quiet, -q            Suppress the summary report
 ```
 
 ### config.json
@@ -59,7 +60,33 @@ The script reads settings from three sources (highest priority first):
 }
 ```
 
-You can also add custom filter patterns — see [Customization](#customization).
+You can also add custom filter patterns -- see [Customization](#customization).
+
+## How It Works
+
+The script processes a Moodle iCal export through a pipeline:
+
+1. **Unfold** -- join RFC 5545 continuation lines (long lines Moodle splits across multiple lines)
+2. **Parse** -- split the calendar into components, parse each property into name/params/value
+3. **Classify** -- drop noise (attendance), detect assignments, extract course codes
+4. **Transform** -- convert assignment events into VTODO tasks with due dates; prepend course codes to summaries
+5. **Emit** -- re-fold long lines to 75 octets, write with CRLF line endings per the iCal spec
+
+| Step | What happens |
+|------|-------------|
+| **Drop noise** | Events matching `DROP_PATTERNS` (attendance, etc.) are removed entirely |
+| **Detect assignments** | Events matching `ASSIGNMENT_PATTERNS` (homework, quiz, exam, due, etc.) are flagged |
+| **Prepend course codes** | A course code (e.g., `LING 130`, `COSI 114a`) is extracted from categories/description/summary and prepended |
+| **Convert to tasks** | Assignment events become `VTODO` items with due dates and `STATUS:NEEDS-ACTION` |
+| **Keep the rest** | Non-assignment events (lectures, office hours) pass through as regular `VEVENT` entries |
+
+### Due date handling
+
+The script derives the `DUE` property from `DTEND` if present, otherwise from `DTSTART`. Both `VALUE=DATE` (all-day) and date-time forms (with or without `TZID`) are preserved as-is. This handles Moodle's inconsistency where some assignment-due events only have `DTSTART`.
+
+### Output format
+
+The output `.ics` file is RFC 5545 compliant: CRLF line endings, lines folded at 75 octets, proper `PRODID`, and a `X-WR-CALNAME` so calendar apps display a friendly name ("Moodle (filtered)").
 
 ## Calendar App Setup
 
@@ -69,43 +96,43 @@ Once you have a filtered `.ics` file, point your calendar app at it.
 
 BusyCal can subscribe to a local file, which is ideal for cron-refreshed calendars:
 
-1. **File → Subscribe…**
+1. **File -> Subscribe...**
 2. Enter the file path as a URL: `file:///path/to/moodle-filtered.ics`
 3. Set refresh to **Every hour** (or let cron handle it and set to **Manually**)
-4. Tasks from VTODO entries appear in BusyCal's task list with due dates ✓
+4. Tasks from VTODO entries appear in BusyCal's task list with due dates
 
 ### Apple Calendar
 
-**Option A — Subscribe (recommended):**
-1. **File → New Calendar Subscription…**
+**Option A -- Subscribe (recommended):**
+1. **File -> New Calendar Subscription...**
 2. Enter `file:///path/to/moodle-filtered.ics`
 3. Set auto-refresh interval
 
-**Option B — Import (one-time):**
-1. **File → Import…** → select the `.ics` file
+**Option B -- Import (one-time):**
+1. **File -> Import...** -> select the `.ics` file
 2. Note: imported events won't update automatically
 
-> **Tip:** Apple Calendar shows VTODO tasks in the Reminders integration. Make sure Reminders is enabled in System Settings.
+Apple Calendar shows VTODO tasks in the Reminders integration. Make sure Reminders is enabled in System Settings.
 
 ### Google Calendar
 
 Google Calendar can't read local files, so you'll need to host the `.ics` somewhere accessible:
 
 1. Host the file on a web server, Dropbox (public link), or a simple HTTP server
-2. In Google Calendar: **Settings → Add calendar → From URL**
+2. In Google Calendar: **Settings -> Add calendar -> From URL**
 3. Paste the URL to your hosted `.ics` file
-4. Google refreshes subscribed calendars every 12–24 hours
+4. Google refreshes subscribed calendars every 12-24 hours
 
-> **Note:** Google Calendar does not support VTODO items natively. Use `--no-keep-events` to skip this, or stick with VEVENT output if you're using Google Calendar exclusively.
+Google Calendar does not support VTODO items natively. Use `--tasks-only` to skip events, or stick with VEVENT output if you're using Google Calendar exclusively.
 
 ### Outlook
 
-1. **File → Open & Export → Import/Export**
+1. **File -> Open & Export -> Import/Export**
 2. Select **Import an iCalendar (.ics) file**
 3. Browse to `moodle-filtered.ics`
 4. Choose **Open as New Calendar** to keep it separate
 
-For Outlook on the web: **Add calendar → Subscribe from web** with a hosted URL.
+For Outlook on the web: **Add calendar -> Subscribe from web** with a hosted URL.
 
 ## Cron Setup
 
@@ -126,32 +153,15 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-## How the Filtering Works
+When running under cron (non-TTY), the summary is a compact single line. In a terminal you get a friendlier breakdown with per-course task counts.
 
-The script processes each `VEVENT` in the Moodle iCal feed:
+## Testing
 
-| Step | What happens |
-|------|-------------|
-| **1. Drop noise** | Events matching `DROP_PATTERNS` (attendance, etc.) are removed entirely |
-| **2. Detect assignments** | Events matching `ASSIGNMENT_PATTERNS` (homework, quiz, exam, due, etc.) are flagged |
-| **3. Prepend course codes** | A course code (e.g., `LING 130`, `COSI 114`) is extracted from the event's categories/description and prepended to the summary |
-| **4. Convert to tasks** | Assignment events become `VTODO` items with all-day due dates — they show up as tasks in compatible apps |
-| **5. Keep the rest** | Non-assignment events (lectures, office hours) pass through as regular `VEVENT` entries |
+```bash
+python3 test_filter.py
+```
 
-### What Gets Dropped
-
-- Attendance check-in events
-- Anything matching patterns in `DROP_PATTERNS`
-
-### What Becomes a Task (VTODO)
-
-- Assignments, homework, quizzes, exams, projects, papers, problem sets
-- Anything matching patterns in `ASSIGNMENT_PATTERNS`
-- Converted to all-day tasks with a due date (no start time)
-
-### What Stays as an Event
-
-- Classes, lectures, office hours, review sessions — everything else
+Tests cover line unfolding/folding, property parsing, DTSTART-only due date derivation, attendance dropping, CRLF output, keep/no-keep/tasks-only flag logic, and course code extraction. Stdlib `unittest` only, no external dependencies.
 
 ## Customization
 
@@ -192,4 +202,4 @@ The script looks for course codes like `COSI 114a` or `LING-130` in event metada
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT -- see [LICENSE](LICENSE).
