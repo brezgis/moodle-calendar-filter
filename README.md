@@ -33,10 +33,10 @@ The script reads settings from three sources (highest priority first):
 
 ### Getting Your Moodle Calendar URL
 
-1. Log in to Moodle
+1. Log in to your Moodle instance
 2. Go to **Calendar** -> **Export calendar**
-3. Select: **All courses**, **Custom time range** (or your preference)
-4. Click **Get calendar URL** -- copy the full URL
+3. Choose what to export (e.g. **Events related to courses**) and a time period (e.g. **Recent and next 60 days**, or **Custom range**)
+4. Click **Get calendar URL** -- copy the full URL (it contains your personal auth token, so treat it like a password)
 5. Paste it into `config.json` as `moodle_url`
 
 ### Command-Line Arguments
@@ -76,7 +76,7 @@ The script processes a Moodle iCal export through a pipeline:
 |------|-------------|
 | **Drop noise** | Events matching `DROP_PATTERNS` (attendance, etc.) are removed entirely |
 | **Detect assignments** | Events matching `ASSIGNMENT_PATTERNS` (homework, quiz, exam, due, etc.) are flagged |
-| **Prepend course codes** | A course code (e.g., `LING 130`, `COSI 114a`) is extracted from categories/description/summary and prepended |
+| **Prepend course codes** | A course code (e.g., `LING 220`, `CS 201a`) is extracted from categories/description/summary and prepended |
 | **Convert to tasks** | Assignment events become `VTODO` items with due dates and `STATUS:NEEDS-ACTION` |
 | **Keep the rest** | Non-assignment events (lectures, office hours) pass through as regular `VEVENT` entries |
 
@@ -184,15 +184,15 @@ Edit `config.json` to add your own patterns:
         "attendance", "attenda",
         "check-in"
     ],
-    "course_code_prefixes": "COSI|LING|PHIL|MATH|CS|ANTH|BIOL|CHEM"
+    "course_code_prefixes": "CS|LING|PHIL|MATH|ANTH|BIOL|CHEM|ECON"
 }
 ```
 
-Patterns are Python regular expressions matched case-insensitively against event summaries.
+Patterns are Python regular expressions matched against the lowercased event summary, so write them in lowercase.
 
 ### Adding Course Code Prefixes
 
-The script looks for course codes like `COSI 114a` or `LING-130` in event metadata. If your institution uses different department codes, add them to `course_code_prefixes` in your config (pipe-separated):
+The script looks for course codes like `CS 201a` or `LING-220` in event metadata. If your institution uses different department codes, add them to `course_code_prefixes` in your config (pipe-separated):
 
 ```json
 {

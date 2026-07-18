@@ -36,7 +36,7 @@ DROP_PATTERNS: list[str] = [
 
 # Common course-code department prefixes. Add your institution's codes in config.
 COURSE_CODE_PREFIXES: str = (
-    r"COSI|LING|PHIL|MATH|CS|ANTH|HIST|PSYC|NEJS|LGCS"
+    r"CS|LING|PHIL|MATH|ANTH|HIST|PSYC"
     r"|BIOL|CHEM|PHYS|ECON|SOC|ENG|COMP|INFO|STAT"
 )
 
@@ -262,7 +262,7 @@ def matches_any(text: str, patterns: list[str]) -> bool:
 
 
 def extract_course_code(component: Component) -> str | None:
-    """Try to extract a course code like 'COSI 114a' from categories, description, or summary."""
+    """Try to extract a course code like 'CS 201a' from categories, description, or summary."""
     pattern = rf"({COURSE_CODE_PREFIXES})[\s_-]*(\d{{1,3}}[A-Za-z]?)"
     for prop_name in ("CATEGORIES", "DESCRIPTION", "SUMMARY"):
         text = component.get_value(prop_name)

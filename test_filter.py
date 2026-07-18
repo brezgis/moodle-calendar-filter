@@ -45,29 +45,29 @@ SAMPLE_ICAL = (
     "UID:event-1@moodle\r\n"
     "DTSTAMP:20260115T120000Z\r\n"
     # Folded SUMMARY: the second line starts with a space (continuation).
-    "SUMMARY:COSI 114a - Introduction to Computational Linguistics - Homework\r\n"
-    "  3 Essay on Distributional Semantics and Word Embeddings\r\n"
-    "DESCRIPTION:Submit your essay on distributional semantics.\r\n"
+    "SUMMARY:CS 201a - Introduction to Data Structures and Algorithms - Homework\r\n"
+    "  3 Essay on Amortized Analysis and Hash Table Implementations\r\n"
+    "DESCRIPTION:Submit your essay on amortized analysis.\r\n"
     "DTSTART:20260201T235900Z\r\n"
     "DTEND:20260202T000000Z\r\n"
-    "CATEGORIES:COSI 114a\r\n"
+    "CATEGORIES:CS 201a\r\n"
     "END:VEVENT\r\n"
     "BEGIN:VEVENT\r\n"
     "UID:event-2@moodle\r\n"
     "DTSTAMP:20260115T120000Z\r\n"
-    "SUMMARY:LING 130 - Final project submission\r\n"
+    "SUMMARY:LING 220 - Final project submission\r\n"
     "DESCRIPTION:Upload your final project.\r\n"
     "DTSTART;VALUE=DATE:20260315\r\n"
-    "CATEGORIES:LING 130\r\n"
+    "CATEGORIES:LING 220\r\n"
     "END:VEVENT\r\n"
     "BEGIN:VEVENT\r\n"
     "UID:event-3@moodle\r\n"
     "DTSTAMP:20260115T120000Z\r\n"
-    "SUMMARY:COSI 114a - Attendance\r\n"
+    "SUMMARY:CS 201a - Attendance\r\n"
     "DESCRIPTION:Attendance check-in for today's lecture.\r\n"
     "DTSTART:20260120T140000Z\r\n"
     "DTEND:20260120T153000Z\r\n"
-    "CATEGORIES:COSI 114a\r\n"
+    "CATEGORIES:CS 201a\r\n"
     "END:VEVENT\r\n"
     "BEGIN:VEVENT\r\n"
     "UID:event-4@moodle\r\n"
@@ -81,11 +81,11 @@ SAMPLE_ICAL = (
     "BEGIN:VEVENT\r\n"
     "UID:event-5@moodle\r\n"
     "DTSTAMP:20260115T120000Z\r\n"
-    "SUMMARY:MATH 15a - Quiz 2\r\n"
+    "SUMMARY:MATH 220 - Quiz 2\r\n"
     "DESCRIPTION:In-class quiz.\r\n"
     "DTSTART;TZID=America/New_York:20260205T140000\r\n"
     "DTEND;TZID=America/New_York:20260205T150000\r\n"
-    "CATEGORIES:MATH 15a\r\n"
+    "CATEGORIES:MATH 220\r\n"
     "END:VEVENT\r\n"
     "END:VCALENDAR\r\n"
 )
@@ -184,18 +184,18 @@ class TestFoldedSummaryDetection(unittest.TestCase):
     def test_folded_summary_course_detected(self):
         """A folded SUMMARY should have its course code detected and prepended."""
         result, stats = filter_ical(SAMPLE_ICAL)
-        # Event 1 has a folded SUMMARY with "COSI 114a" -- it's an assignment.
+        # Event 1 has a folded SUMMARY with "CS 201a" -- it's an assignment.
         # The full unfolded summary mentions "Homework" -> assignment pattern.
         # It should become a VTODO with the course code prepended.
         self.assertGreater(stats.tasks_created, 0, "No tasks created -- folded summary not detected?")
         # The course code should appear in the output.
-        self.assertIn("COSI 114", result)
+        self.assertIn("CS 201", result)
 
     def test_folded_summary_full_text_preserved(self):
         """After unfolding, the full summary text should be in the output."""
         result, stats = filter_ical(SAMPLE_ICAL)
-        # The folded continuation "3 Essay on Distributional Semantics" should be joined.
-        self.assertIn("Distributional Semantics", result)
+        # The folded continuation "3 Essay on Amortized Analysis" should be joined.
+        self.assertIn("Amortized Analysis", result)
 
 
 class TestDtStartOnlyDueDate(unittest.TestCase):
@@ -204,8 +204,8 @@ class TestDtStartOnlyDueDate(unittest.TestCase):
     def test_dtstart_only_produces_due(self):
         """Event 2 has DTSTART;VALUE=DATE:20260315 but no DTEND."""
         result, stats = filter_ical(SAMPLE_ICAL)
-        # LING 130 final project should be a task.
-        self.assertIn("LING 130", result)
+        # LING 220 final project should be a task.
+        self.assertIn("LING 220", result)
         # It must have a DUE property.
         self.assertIn("DUE", result)
         # The date should be 20260315.
@@ -214,8 +214,8 @@ class TestDtStartOnlyDueDate(unittest.TestCase):
     def test_dtend_preferred_over_dtstart(self):
         """Event 5 has both DTSTART and DTEND -- DUE should use DTEND."""
         result, stats = filter_ical(SAMPLE_ICAL)
-        # MATH 15a Quiz 2 has DTEND on 20260205T150000 with TZID.
-        self.assertIn("MATH 15", result)
+        # MATH 220 Quiz 2 has DTEND on 20260205T150000 with TZID.
+        self.assertIn("MATH 220", result)
         self.assertIn("20260205T150000", result)
 
     def test_value_date_preserved(self):
@@ -341,9 +341,9 @@ class TestFilterStats(unittest.TestCase):
 
     def test_task_courses_breakdown(self):
         _, stats = filter_ical(SAMPLE_ICAL)
-        self.assertIn("COSI 114a", stats.task_courses)
-        self.assertIn("LING 130", stats.task_courses)
-        self.assertIn("MATH 15a", stats.task_courses)
+        self.assertIn("CS 201a", stats.task_courses)
+        self.assertIn("LING 220", stats.task_courses)
+        self.assertIn("MATH 220", stats.task_courses)
 
 
 class TestEventToTodo(unittest.TestCase):
